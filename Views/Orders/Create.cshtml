@@ -1,0 +1,113 @@
+@model ECOMMAPP.Core.Entities.Order
+
+@{
+    ViewData["Title"] = "Create Order";
+}
+
+<h1>Create Order</h1>
+
+<div class="row">
+    <div class="col-md-8">
+        <form asp-action="Create" method="post">
+            <div asp-validation-summary="ModelOnly" class="text-danger"></div>
+            
+            <div class="card mb-4">
+                <div class="card-header d-flex justify-content-between align-items-center">
+                    <h4>Order Items</h4>
+                    <button type="button" id="add-item" class="btn btn-sm btn-secondary">Add Another Item</button>
+                </div>
+                <div class="card-body">
+                    <table class="table" id="items-table">
+                        <thead>
+                            <tr>
+                                <th>Product</th>
+                                <th>Quantity</th>
+                                <th>Action</th>
+                            </tr>
+                        </thead>
+                        <tbody id="items-container">
+                            <!-- Initial item row -->
+                            <tr class="item-row">
+                                <td>
+                                    <select name="Items[0].ProductId" class="form-control product-select" required>
+                                        <option value="">-- Select Product --</option>
+                                        @foreach (var item in ViewBag.Products)
+                                        {
+                                            <option value="@item.Value">@item.Text</option>
+                                        }
+                                    </select>
+                                    <span class="text-danger field-validation-error" data-valmsg-for="Items[0].ProductId"></span>
+                                </td>
+                                <td>
+                                    <input name="Items[0].Quantity" class="form-control" type="number" min="1" value="1" required />
+                                    <span class="text-danger field-validation-error" data-valmsg-for="Items[0].Quantity"></span>
+                                </td>
+                                <td>
+                                    <button type="button" class="btn btn-danger btn-sm remove-item">Remove</button>
+                                </td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+            
+            <div class="form-group mt-3">
+                <button type="submit" class="btn btn-primary">Submit Order</button>
+                <a asp-action="Index" class="btn btn-outline-secondary">Back to List</a>
+            </div>
+        </form>
+    </div>
+</div>
+
+@section Scripts {
+    @{await Html.RenderPartialAsync("_ValidationScriptsPartial");}
+    
+    <script>
+        $(document).ready(function() {
+            console.log("Order page script loaded");
+            
+            // Add new item row
+            $("#add-item").click(function() {
+                console.log("Add item button clicked");
+                var rowCount = $(".item-row").length;
+                var newRow = $(".item-row:first").clone();
+                
+                // Update indices in the cloned row
+                newRow.find("select, input").each(function() {
+                    var name = $(this).attr("name");
+                    var newName = name.replace(/\[\d+\]/, "[" + rowCount + "]");
+                    $(this).attr("name", newName);
+                    
+                    // Reset values
+                    if ($(this).is("select")) {
+                        $(this).val("");
+                    } else if ($(this).is("input[type=number]")) {
+                        $(this).val(1);
+                    }
+                });
+                
+                // Update validation attributes
+                newRow.find(".field-validation-error").each(function() {
+                    var forAttr = $(this).attr("data-valmsg-for");
+                    if (forAttr) {
+                        var newFor = forAttr.replace(/\[\d+\]/, "[" + rowCount + "]");
+                        $(this).attr("data-valmsg-for", newFor);
+                    }
+                });
+                
+                // Add new row to the table
+                $("#items-container").append(newRow);
+            });
+            
+            // Remove item row
+            $(document).on("click", ".remove-item", function() {
+                console.log("Remove item button clicked");
+                if ($(".item-row").length > 1) {
+                    $(this).closest("tr").remove();
+                } else {
+                    alert("Cannot remove the last item. Order must have at least one item.");
+                }
+            });
+        });
+    </script>
+}
