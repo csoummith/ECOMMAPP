@@ -32,9 +32,9 @@ namespace ECOMMAPP.Infrastructure.Repositories
         public async Task<Order> GetByIdAsync(int id)
         {
             return await _context.Orders
-                .Include(o => o.Items)
-                    .ThenInclude(i => i.Product)
-                .FirstOrDefaultAsync(o => o.Id == id);
+        .Include(o => o.Items)
+        .ThenInclude(i => i.Product)
+        .FirstOrDefaultAsync(o => o.Id == id);
         }
 
        public async Task<Order> AddAsync(Order order)

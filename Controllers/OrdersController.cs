@@ -109,24 +109,41 @@ public async Task<IActionResult> Create()
 }
 
         // GET: Orders/Details/5
-        public async Task<IActionResult> Details(int id)
+       public async Task<IActionResult> Details(int id)
+{
+    try
+    {
+        var order = await _orderService.GetOrderByIdAsync(id);
+        
+        if (order == null)
         {
-            try
+            return NotFound();
+        }
+
+        // Make sure product details are loaded
+        if (order.Items != null)
+        {
+            foreach (var item in order.Items)
             {
-                var order = await _orderService.GetOrderByIdAsync(id);
-                return View(order);
-            }
-            catch (OrderNotFoundException)
-            {
-                return NotFound();
-            }
-            catch (Exception ex)
-            {
-                _logger.LogError(ex, $"Error retrieving order details for ID {id}");
-                TempData["ErrorMessage"] = $"Error retrieving order details: {ex.Message}";
-                return RedirectToAction(nameof(Index));
+                if (item.Product == null && item.ProductId > 0)
+                {
+                    item.Product = await _productService.GetProductByIdAsync(item.ProductId);
+                }
             }
         }
+
+        return View(order);
+    }
+    catch (OrderNotFoundException)
+    {
+        return NotFound();
+    }
+    catch (Exception ex)
+    {
+        TempData["ErrorMessage"] = $"Error retrieving order details: {ex.Message}";
+        return RedirectToAction(nameof(Index));
+    }
+}
 
         // POST: Orders/Cancel/5
         [HttpPost]
