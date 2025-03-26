@@ -144,6 +144,42 @@ public async Task<IActionResult> Create()
         return RedirectToAction(nameof(Index));
     }
 }
+[HttpPost]
+[ValidateAntiForgeryToken]
+public async Task<IActionResult> Fulfill(int id)
+{
+    try
+    {
+        // For debugging
+        Console.WriteLine($"Fulfill action called for order ID: {id}");
+        
+        // Get the order
+        var order = await _orderService.GetOrderByIdAsync(id);
+        
+        // Update status directly
+        order.Status = ECOMMAPP.Core.Enums.OrderStatus.Fulfilled;
+        
+        // Save changes
+        await _orderService.UpdateOrderAsync(order);
+        
+        TempData["SuccessMessage"] = "Order has been fulfilled successfully.";
+        return RedirectToAction(nameof(Details), new { id });
+    }
+    catch (OrderNotFoundException)
+    {
+        return NotFound();
+    }
+    catch (InvalidOperationException ex)
+    {
+        TempData["ErrorMessage"] = ex.Message;
+        return RedirectToAction(nameof(Details), new { id });
+    }
+    catch (Exception ex)
+    {
+        TempData["ErrorMessage"] = $"Error fulfilling order: {ex.Message}";
+        return RedirectToAction(nameof(Details), new { id });
+    }
+}
 
         // POST: Orders/Cancel/5
         [HttpPost]

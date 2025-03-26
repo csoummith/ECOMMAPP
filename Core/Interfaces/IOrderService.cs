@@ -11,6 +11,7 @@ namespace ECOMMAPP.Core.Interfaces
         Task<Order> GetOrderByIdAsync(int id);
         Task<Order> PlaceOrderAsync(Order order);
         Task CancelOrderAsync(int orderId);
+        Task UpdateOrderAsync(Order order);
         Task<IEnumerable<Order>> GetOrdersByStatusAsync(OrderStatus status);
         Task FulfillOrderAsync(int orderId);
     }

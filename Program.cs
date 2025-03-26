@@ -62,7 +62,7 @@ else
     app.UseExceptionHandler("/Home/Error");
     app.UseHsts();
 }
-
+//builder.WebHost.UseUrls("http://localhost:5000");
 app.UseHttpsRedirection();
 app.UseStaticFiles();
 

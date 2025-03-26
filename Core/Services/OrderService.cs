@@ -173,6 +173,7 @@ public async Task<Order> PlaceOrderAsync(Order order)
 
             // Update order status
             order.Status = OrderStatus.Fulfilled;
+             order.LastUpdated = DateTime.UtcNow;
             await _orderRepository.UpdateAsync(order);
             
             // Send notification
@@ -180,5 +181,14 @@ public async Task<Order> PlaceOrderAsync(Order order)
             
             _logger.LogInformation($"Order {orderId} has been fulfilled");
         }
+        public async Task UpdateOrderAsync(Order order)
+{
+    if (order == null)
+    {
+        throw new ArgumentNullException(nameof(order));
+    }
+    
+    await _orderRepository.UpdateAsync(order);
+}
     }
 }
