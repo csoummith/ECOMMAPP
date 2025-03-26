@@ -12,6 +12,8 @@ namespace ECOMMAPP.Core.Entities
     [Required(ErrorMessage = "Please select a product")]
     [Display(Name = "Product")]
     public int ProductId { get; set; }
+    [StringLength(50)]
+public string ReservationId { get; set; }
     
     [Required]
     [Range(1, 1000, ErrorMessage = "Quantity must be between 1 and 1000")]

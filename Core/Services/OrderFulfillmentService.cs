@@ -66,7 +66,7 @@ namespace ECOMMAPP.Core.Services
                             _logger.LogInformation($"Processing order {order.Id} for fulfillment");
                             
                             // Simulate processing time (2-5 seconds)
-                            int processingTime = _random.Next(2000, 5000);
+                            int processingTime = _random.Next(1000, 5000);
                             await Task.Delay(processingTime, stoppingToken);
                             
                             // Fulfill the order

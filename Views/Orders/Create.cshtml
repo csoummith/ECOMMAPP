@@ -7,52 +7,70 @@
 <h1>Create Order</h1>
 
 <div class="row">
-    <div class="col-md-8">
-        <form asp-action="Create" method="post">
+    <div class="col-md-10">
+        <form asp-action="Create" method="post" id="order-form">
             <div asp-validation-summary="ModelOnly" class="text-danger"></div>
             
+            
+            <!-- Product selection section -->
             <div class="card mb-4">
                 <div class="card-header d-flex justify-content-between align-items-center">
-                    <h4>Order Items</h4>
-                    <button type="button" id="add-item" class="btn btn-sm btn-secondary">Add Another Item</button>
+                    <h4>Add Products</h4>
                 </div>
                 <div class="card-body">
-                    <table class="table" id="items-table">
+                    <div class="row">
+                        <div class="col-md-5">
+                            <select id="product-select" class="form-control">
+                                <option value="">-- Select Product --</option>
+                                @foreach (var item in ViewBag.Products)
+                                {
+                                    <option value="@item.Value" data-price="@item.Price">@item.Text</option>
+                                }
+                            </select>
+                        </div>
+                        <div class="col-md-3">
+                            <input id="quantity-input" type="number" class="form-control" min="1" value="1" />
+                        </div>
+                        <div class="col-md-4">
+                            <button type="button" id="add-to-cart-btn" class="btn btn-primary">Add to Cart</button>
+                        </div>
+                    </div>
+                    <div id="item-error" class="text-danger mt-2" style="display: none;"></div>
+                </div>
+            </div>
+            
+            <!-- Order items (cart) section -->
+            <div class="card mb-4">
+                <div class="card-header">
+                    <h4>Order Items</h4>
+                </div>
+                <div class="card-body">
+                    <table class="table" id="cart-table">
                         <thead>
                             <tr>
                                 <th>Product</th>
+                                <th>Price</th>
                                 <th>Quantity</th>
+                                <th>Subtotal</th>
                                 <th>Action</th>
                             </tr>
                         </thead>
-                        <tbody id="items-container">
-                            <!-- Initial item row -->
-                            <tr class="item-row">
-                                <td>
-                                    <select name="Items[0].ProductId" class="form-control product-select" required>
-                                        <option value="">-- Select Product --</option>
-                                        @foreach (var item in ViewBag.Products)
-                                        {
-                                            <option value="@item.Value">@item.Text</option>
-                                        }
-                                    </select>
-                                    <span class="text-danger field-validation-error" data-valmsg-for="Items[0].ProductId"></span>
-                                </td>
-                                <td>
-                                    <input name="Items[0].Quantity" class="form-control" type="number" min="1" value="1" required />
-                                    <span class="text-danger field-validation-error" data-valmsg-for="Items[0].Quantity"></span>
-                                </td>
-                                <td>
-                                    <button type="button" class="btn btn-danger btn-sm remove-item">Remove</button>
-                                </td>
-                            </tr>
+                        <tbody id="cart-items">
+                            <!-- Cart items will be dynamically added here -->
                         </tbody>
+                        <tfoot>
+                            <tr>
+                                <th colspan="3" class="text-end">Total:</th>
+                                <th id="cart-total">$0.00</th>
+                                <th></th>
+                            </tr>
+                        </tfoot>
                     </table>
                 </div>
             </div>
             
             <div class="form-group mt-3">
-                <button type="submit" class="btn btn-primary">Submit Order</button>
+                <button type="submit" id="submit-order-btn" class="btn btn-primary">Submit Order</button>
                 <a asp-action="Index" class="btn btn-outline-secondary">Back to List</a>
             </div>
         </form>
@@ -63,51 +81,221 @@
     @{await Html.RenderPartialAsync("_ValidationScriptsPartial");}
     
     <script>
-        $(document).ready(function() {
+               $(document).ready(function() {
             console.log("Order page script loaded");
             
-            // Add new item row
-            $("#add-item").click(function() {
-                console.log("Add item button clicked");
-                var rowCount = $(".item-row").length;
-                var newRow = $(".item-row:first").clone();
+            // Keep track of added items
+            var cartItems = [];
+            
+            // Update cart total
+            function updateTotal() {
+                var total = 0;
+                cartItems.forEach(function(item) {
+                    total += item.unitPrice * item.quantity;
+                });
+                $("#cart-total").text("$" + total.toFixed(2));
+            }
+            
+            // Add to cart button click
+            $("#add-to-cart-btn").click(function() {
+                var productSelect = $("#product-select");
+                var quantityInput = $("#quantity-input");
+                var errorDisplay = $("#item-error");
                 
-                // Update indices in the cloned row
-                newRow.find("select, input").each(function() {
-                    var name = $(this).attr("name");
-                    var newName = name.replace(/\[\d+\]/, "[" + rowCount + "]");
-                    $(this).attr("name", newName);
-                    
-                    // Reset values
-                    if ($(this).is("select")) {
-                        $(this).val("");
-                    } else if ($(this).is("input[type=number]")) {
-                        $(this).val(1);
+                var productId = productSelect.val();
+                var productName = productSelect.find("option:selected").text();
+                var quantity = parseInt(quantityInput.val());
+                
+                // Clear previous errors
+                errorDisplay.hide().text("");
+                
+                // Basic validation
+                if (!productId) {
+                    errorDisplay.text("Please select a product").show();
+                    return;
+                }
+                
+                if (isNaN(quantity) || quantity < 1) {
+                    errorDisplay.text("Quantity must be at least 1").show();
+                    return;
+                }
+                
+                // First validate the stock
+                $.ajax({
+                    url: '@Url.Action("ValidateStock", "Orders")',
+                    type: 'POST',
+                    data: {
+                        productId: productId,
+                        quantity: quantity
+                    },
+                    success: function(response) {
+                        if (response.success) {
+                            // Stock is available, now reserve it
+                            reserveStock(productId, productName, quantity, response.unitPrice);
+                        } else {
+                            // Show error message
+                            errorDisplay.text(response.message).show();
+                        }
+                    },
+                    error: function(xhr, status, error) {
+                        errorDisplay.text("Error validating stock: " + error).show();
                     }
                 });
-                
-                // Update validation attributes
-                newRow.find(".field-validation-error").each(function() {
-                    var forAttr = $(this).attr("data-valmsg-for");
-                    if (forAttr) {
-                        var newFor = forAttr.replace(/\[\d+\]/, "[" + rowCount + "]");
-                        $(this).attr("data-valmsg-for", newFor);
-                    }
-                });
-                
-                // Add new row to the table
-                $("#items-container").append(newRow);
             });
             
-            // Remove item row
-            $(document).on("click", ".remove-item", function() {
-                console.log("Remove item button clicked");
-                if ($(".item-row").length > 1) {
-                    $(this).closest("tr").remove();
+            // Reserve stock function
+            function reserveStock(productId, productName, quantity, unitPrice) {
+                $.ajax({
+                    url: '@Url.Action("ReserveStock", "Orders")',
+                    type: 'POST',
+                    data: {
+                        productId: productId,
+                        quantity: quantity
+                    },
+                    success: function(response) {
+                        if (response.success) {
+                            // Add to cart
+                            addItemToCart(
+                                productId, 
+                                productName, 
+                                unitPrice, 
+                                quantity, 
+                                response.reservationId
+                            );
+                            
+                            // Update product options to show new stock level
+                            var option = $("#product-select option[value='" + productId + "']");
+                            var currentText = option.text();
+                            // Update option text to show new stock quantity
+                            if (currentText.includes(" (")) {
+                                option.text(currentText.replace(/ \(\d+ in stock\)/, " (" + response.newStockQuantity + " in stock)"));
+                            } else {
+                                option.text(currentText + " (" + response.newStockQuantity + " in stock)");
+                            }
+                        } else {
+                            $("#item-error").text(response.message).show();
+                        }
+                    },
+                    error: function(xhr, status, error) {
+                        $("#item-error").text("Error reserving stock: " + error).show();
+                    }
+                });
+            }
+            
+            // Add item to cart
+            function addItemToCart(productId, productName, unitPrice, quantity, reservationId) {
+                // Check if product is already in cart
+                var existingItemIndex = cartItems.findIndex(item => item.productId == productId);
+                
+                if (existingItemIndex !== -1) {
+                    // Update existing item
+                    cartItems[existingItemIndex].quantity += quantity;
+                    cartItems[existingItemIndex].reservationId = reservationId;
                 } else {
-                    alert("Cannot remove the last item. Order must have at least one item.");
+                    // Add new item
+                    cartItems.push({
+                        productId: productId,
+                        productName: productName,
+                        unitPrice: unitPrice,
+                        quantity: quantity,
+                        reservationId: reservationId
+                    });
                 }
+                
+                // Update display
+                refreshCartDisplay();
+                
+                // Reset selection
+                $("#product-select").val("");
+                $("#quantity-input").val(1);
+            }
+            
+            // Remove item from cart
+            $(document).on("click", ".remove-item", function() {
+                var row = $(this).closest("tr");
+                var productId = row.data("product-id");
+                var quantity = row.data("quantity");
+                var reservationId = row.data("reservation-id");
+                
+                // Release the stock
+                $.ajax({
+                    url: '@Url.Action("ReleaseStock", "Orders")',
+                    type: 'POST',
+                    data: {
+                        productId: productId,
+                        quantity: quantity,
+                        reservationId: reservationId
+                    },
+                    success: function(response) {
+                        if (response.success) {
+                            // Update product option to show new stock level
+                            var option = $("#product-select option[value='" + productId + "']");
+                            var currentText = option.text();
+                            if (currentText.includes(" (")) {
+                                option.text(currentText.replace(/ \(\d+ in stock\)/, " (" + response.newStockQuantity + " in stock)"));
+                            } else {
+                                option.text(currentText + " (" + response.newStockQuantity + " in stock)");
+                            }
+                            
+                            // Remove from cart items array
+                            cartItems = cartItems.filter(item => item.productId != productId);
+                            
+                            // Update display
+                            refreshCartDisplay();
+                        } else {
+                            alert("Error releasing stock: " + response.message);
+                        }
+                    },
+                    error: function(xhr, status, error) {
+                        alert("Error releasing stock: " + error);
+                    }
+                });
             });
+            
+            // Submit order form
+            $("#order-form").submit(function(e) {
+                if (cartItems.length === 0) {
+                    e.preventDefault();
+                    alert("Please add at least one item to your order.");
+                    return false;
+                }
+                
+                // The form will submit normally with the hidden inputs
+            });
+            
+            // Refresh cart display
+            function refreshCartDisplay() {
+                var cartBody = $("#cart-items");
+                cartBody.empty();
+                
+                cartItems.forEach(function(item, index) {
+                    var subtotal = (item.unitPrice * item.quantity).toFixed(2);
+                    var row = `
+                        <tr data-product-id="${item.productId}" data-quantity="${item.quantity}" data-reservation-id="${item.reservationId}">
+                            <td>
+                                ${item.productName}
+                                <input type="hidden" name="Items[${index}].ProductId" value="${item.productId}" />
+                                <input type="hidden" name="Items[${index}].ReservationId" value="${item.reservationId}" />
+                            </td>
+                            <td>
+                                $${item.unitPrice.toFixed(2)}
+                                <input type="hidden" name="Items[${index}].UnitPrice" value="${item.unitPrice}" />
+                            </td>
+                            <td>
+                                ${item.quantity}
+                                <input type="hidden" name="Items[${index}].Quantity" value="${item.quantity}" />
+                            </td>
+                            <td>$${subtotal}</td>
+                            <td>
+                                <button type="button" class="btn btn-danger btn-sm remove-item">Remove</button>
+                            </td>
+                        </tr>
+                    `;
+                    cartBody.append(row);
+                });
+                
+                updateTotal();
+            }
         });
     </script>
 }

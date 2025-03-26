@@ -2,6 +2,8 @@ using ECOMMAPP.Core.Entities;
 using ECOMMAPP.Core.Enums;
 using ECOMMAPP.Core.Exceptions;
 using ECOMMAPP.Core.Interfaces;
+using ECOMMAPP.Extensions;
+using Microsoft.AspNetCore.Http;
 using Microsoft.Extensions.Logging;
 using System;
 using System.Collections.Generic;
@@ -16,19 +18,26 @@ namespace ECOMMAPP.Core.Services
         private readonly IProductRepository _productRepository;
         private readonly INotificationService _notificationService;
         private readonly ILogger<OrderService> _logger;
+         private readonly IHttpContextAccessor _httpContextAccessor;
 
         public OrderService(
             IOrderRepository orderRepository,
             IProductRepository productRepository,
             INotificationService notificationService,
-            ILogger<OrderService> logger)
+            ILogger<OrderService> logger, IHttpContextAccessor httpContextAccessor)
         {
             _orderRepository = orderRepository;
             _productRepository = productRepository;
             _notificationService = notificationService;
             _logger = logger;
+             _httpContextAccessor = httpContextAccessor;
         }
-
+ private class ReservationInfo
+        {
+            public int ProductId { get; set; }
+            public int Quantity { get; set; }
+            public DateTime Timestamp { get; set; }
+        }
         public async Task<IEnumerable<Order>> GetAllOrdersAsync()
         {
             _logger.LogInformation("Retrieving all orders");
@@ -48,71 +57,122 @@ namespace ECOMMAPP.Core.Services
         }
 public async Task<Order> PlaceOrderAsync(Order order)
 {
-    _logger.LogInformation("Placing a new order");
+      _logger.LogInformation("Placing a new order");
 
-    if (order == null)
-    {
-        throw new ArgumentNullException(nameof(order));
-    }
+            if (order == null)
+            {
+                throw new ArgumentNullException(nameof(order));
+            }
 
-    if (order.Items == null || !order.Items.Any())
-    {
-        _logger.LogWarning("Order contains no items");
-        throw new ArgumentException("Order must contain at least one item");
-    }
+            if (order.Items == null || !order.Items.Any())
+            {
+                _logger.LogWarning("Order contains no items");
+                throw new ArgumentException("Order must contain at least one item");
+            }
 
-    // Step 1: Validate inventory for each item
-    foreach (var item in order.Items)
-    {
-        _logger.LogInformation($"Validating inventory for product ID: {item.ProductId}, quantity: {item.Quantity}");
-        
-        // Retrieve the product to get current information
-        var product = await _productRepository.GetByIdAsync(item.ProductId);
-        if (product == null)
-        {
-            _logger.LogWarning($"Product with ID {item.ProductId} not found");
-            throw new KeyNotFoundException($"Product with ID {item.ProductId} not found");
-        }
+            // Get reservations from session - only if HttpContext is available
+            Dictionary<string, ReservationInfo> reservations = null;
+            
+            if (_httpContextAccessor.HttpContext != null)
+            {
+                reservations = _httpContextAccessor.HttpContext.Session?.GetObject<Dictionary<string, ReservationInfo>>("TempReservations");
+                _logger.LogInformation($"Found {reservations?.Count ?? 0} reservations in session");
+            }
 
-        // Check if enough stock is available
-        if (product.StockQuantity < item.Quantity)
-        {
-            _logger.LogWarning($"Insufficient stock for product {product.Name} (ID: {product.Id}). " +
-                              $"Requested: {item.Quantity}, Available: {product.StockQuantity}");
-            throw new InsufficientStockException(
-                product.Id,
-                item.Quantity,
-                product.StockQuantity);
-        }
+            // Step 1: Validate inventory for each item
+            foreach (var item in order.Items)
+            {
+                _logger.LogInformation($"Validating inventory for product ID: {item.ProductId}, quantity: {item.Quantity}");
+                
+                // Check if the item has a valid reservation
+                bool hasValidReservation = false;
+                
+                if (reservations != null && !string.IsNullOrEmpty(item.ReservationId) && 
+                    reservations.TryGetValue(item.ReservationId, out var reservation))
+                {
+                    _logger.LogInformation($"Found reservation {item.ReservationId} for product {item.ProductId}");
+                    hasValidReservation = true;
+                }
+                
+                if (!hasValidReservation)
+                {
+                    // No valid reservation, perform regular inventory check
+                    var product = await _productRepository.GetByIdAsync(item.ProductId);
+                    if (product == null)
+                    {
+                        _logger.LogWarning($"Product with ID {item.ProductId} not found");
+                        throw new KeyNotFoundException($"Product with ID {item.ProductId} not found");
+                    }
 
-        // Set current price on the order item
-        item.UnitPrice = product.Price;
-        
-        // Clear navigation properties to avoid validation issues
-        item.Order = null;
-        item.Product = null;
-        
-        _logger.LogInformation($"Set unit price to {item.UnitPrice} for product ID: {item.ProductId}");
-    }
+                    // Check if enough stock is available
+                    if (product.StockQuantity < item.Quantity)
+                    {
+                        _logger.LogWarning($"Insufficient stock for product {product.Name} (ID: {product.Id}). " +
+                                        $"Requested: {item.Quantity}, Available: {product.StockQuantity}");
+                        throw new InsufficientStockException(
+                            product.Id,
+                            item.Quantity,
+                            product.StockQuantity);
+                    }
 
-    // Step 2: Reserve inventory (reduce stock) for each item
-    foreach (var item in order.Items)
-    {
-        _logger.LogInformation($"Updating stock for product ID: {item.ProductId}, quantity: {item.Quantity}");
-        await _productRepository.UpdateStockAsync(item.ProductId, item.Quantity);
-        _logger.LogInformation($"Reserved {item.Quantity} units of product ID {item.ProductId}");
-    }
+                    // Set current price on the order item if not already set
+                    if (item.UnitPrice <= 0)
+                    {
+                        item.UnitPrice = product.Price;
+                    }
+                    
+                    // Since this item wasn't properly reserved, we need to update stock now
+                    _logger.LogInformation($"Updating stock for product ID: {item.ProductId}, quantity: {item.Quantity}");
+                    await _productRepository.UpdateStockAsync(item.ProductId, item.Quantity);
+                    _logger.LogInformation($"Reserved {item.Quantity} units of product ID {item.ProductId}");
+                }
+                else
+                {
+                    // Reservation exists, just retrieve the product to get the current price if needed
+                    if (item.UnitPrice <= 0)
+                    {
+                        var product = await _productRepository.GetByIdAsync(item.ProductId);
+                        if (product != null)
+                        {
+                            item.UnitPrice = product.Price;
+                        }
+                    }
+                    
+                    _logger.LogInformation($"Using existing reservation for product ID: {item.ProductId}");
+                }
+                
+                // Clear navigation properties to avoid validation issues
+                item.Order = null;
+                item.Product = null;
+            }
 
-    // Step 3: Save the order
-    order.OrderDate = DateTime.UtcNow;
-    order.Status = OrderStatus.PendingFulfillment;
-    order.LastUpdated = DateTime.UtcNow;
-    
-    _logger.LogInformation("Calling repository to save order");
-    var createdOrder = await _orderRepository.AddAsync(order);
-    _logger.LogInformation($"Order created successfully with ID: {createdOrder.Id}");
-    
-    return createdOrder;
+            // Step 2: Remove any used reservations from the session if available
+            if (reservations != null && _httpContextAccessor.HttpContext != null)
+            {
+                foreach (var item in order.Items)
+                {
+                    if (!string.IsNullOrEmpty(item.ReservationId) && reservations.ContainsKey(item.ReservationId))
+                    {
+                        _logger.LogInformation($"Removing reservation {item.ReservationId} from session");
+                        reservations.Remove(item.ReservationId);
+                    }
+                }
+
+                // Update session
+                _httpContextAccessor.HttpContext.Session?.SetObject("TempReservations", reservations);
+            }
+            
+            // Step 3: Save the order
+            order.OrderDate = DateTime.UtcNow;
+            order.Status = OrderStatus.PendingFulfillment;
+            order.LastUpdated = DateTime.UtcNow;
+            
+            _logger.LogInformation("Calling repository to save order");
+            var createdOrder = await _orderRepository.AddAsync(order);
+            _logger.LogInformation($"Order created successfully with ID: {createdOrder.Id}");
+            
+            return createdOrder;
+
 }
 
         public async Task CancelOrderAsync(int orderId)
