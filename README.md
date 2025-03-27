@@ -42,6 +42,7 @@ CREATE TABLE `OrderItems` (
     `ProductId` int NOT NULL,
     `Quantity` int NOT NULL,
     `UnitPrice` decimal(18, 2) NOT NULL,
+    'ReservationId' VARCHAR(50)
     PRIMARY KEY (`Id`),
     CONSTRAINT `FK_OrderItems_Orders_OrderId` FOREIGN KEY (`OrderId`) REFERENCES `Orders` (`Id`) ON DELETE CASCADE,
     CONSTRAINT `FK_OrderItems_Products_ProductId` FOREIGN KEY (`ProductId`) REFERENCES `Products` (`Id`) ON DELETE RESTRICT
