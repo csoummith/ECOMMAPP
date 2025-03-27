@@ -155,9 +155,8 @@ To test the Application
 dotnet build 
 dotnet test
 
-**
-Concurrency and Asynchronous Processing
-**
+
+**Concurrency and Asynchronous Processing**
 This application implements robust concurrency control and asynchronous processing to handle multiple users and background operations.
 Concurrency Control
 
