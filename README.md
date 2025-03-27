@@ -155,4 +155,35 @@ To test the Application
 dotnet build 
 dotnet test
 
+**
+Concurrency and Asynchronous Processing
+**
+This application implements robust concurrency control and asynchronous processing to handle multiple users and background operations.
+Concurrency Control
+
+Optimistic Concurrency: Uses LastUpdated DateTime fields with the [ConcurrencyCheck] attribute to detect and prevent conflicts when multiple users update the same records
+Database Transactions: Ensures atomic operations during inventory updates to maintain data integrity
+Thread-Safe Operations: The UpdateStockAsync method in ProductRepository uses database transactions to safely modify inventory quantities
+
+Inventory Management
+
+Real-Time Validation: Checks product availability before allowing order placement
+Inventory Locking: When adding items to cart, inventory is temporarily reserved to prevent overselling
+Inventory Restoration: When orders are canceled, the reserved inventory is automatically restored
+
+Asynchronous Order Processing
+
+Background Service: OrderFulfillmentService runs as a hosted service separate from the request pipeline
+IHostedService Implementation: Inherits from BackgroundService to process orders asynchronously
+Periodic Processing: Scans for pending orders at regular intervals
+Notification System: Simulates sending notifications when orders are fulfilled
+
+Implementation Details
+
+Dependency Injection: Services are scoped appropriately for concurrent access
+Task-based Processing: All operations use async/await patterns for non-blocking execution
+Exception Handling: Robust exception handling prevents failed operations from affecting the entire system
+Order Status Management: Clear state transitions from PendingFulfillment to Fulfilled or Canceled
+
+This architecture ensures that the system can handle multiple concurrent users placing orders while maintaining data consistency and providing a responsive user experience.
 
