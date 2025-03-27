@@ -11,6 +11,7 @@ using ECOMMAPP.Core.Enums;
 using ECOMMAPP.Core.Exceptions;
 using System.Linq;
 using Microsoft.Extensions.Logging;
+using Microsoft.AspNetCore.Http;
 
 namespace ECOMMAPP.Tests.Services
 {
@@ -21,7 +22,7 @@ namespace ECOMMAPP.Tests.Services
         private readonly Mock<INotificationService> _mockNotificationService;
         private readonly Mock<ILogger<OrderService>> _mockLogger;
         private readonly OrderService _orderService;
-         private readonly Mock<IHttpContextAccessor> _mockHttpContextAccessor; 
+        private readonly Mock<IHttpContextAccessor> _mockHttpContextAccessor; 
 
         public OrderServiceTests()
         {

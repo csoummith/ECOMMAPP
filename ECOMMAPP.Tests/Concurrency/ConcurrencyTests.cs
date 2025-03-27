@@ -11,6 +11,7 @@ using ECOMMAPP.Core.Exceptions;
 using ECOMMAPP.Core.Enums;
 using System.Threading;
 using Microsoft.Extensions.Logging;
+using Microsoft.AspNetCore.Http;
 
 namespace ECOMMAPP.Tests.Concurrency
 {

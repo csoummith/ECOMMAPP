@@ -1,8 +1,10 @@
-Microsoft Visual Studio Solution File, Format Version 12.00
+﻿Microsoft Visual Studio Solution File, Format Version 12.00
 # Visual Studio Version 17
 VisualStudioVersion = 17.5.2.0
 MinimumVisualStudioVersion = 10.0.40219.1
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "ECOMMAPP", "ECOMMAPP.csproj", "{40EEB416-8EA0-815C-4F68-B0D696F4A435}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "ECOMMAPP.Tests", "ECOMMAPP.Tests\ECOMMAPP.Tests.csproj", "{D9CD69E7-B3E2-4C40-9824-9455096C59C9}"
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
@@ -14,6 +16,10 @@ Global
 		{40EEB416-8EA0-815C-4F68-B0D696F4A435}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{40EEB416-8EA0-815C-4F68-B0D696F4A435}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{40EEB416-8EA0-815C-4F68-B0D696F4A435}.Release|Any CPU.Build.0 = Release|Any CPU
+		{D9CD69E7-B3E2-4C40-9824-9455096C59C9}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{D9CD69E7-B3E2-4C40-9824-9455096C59C9}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{D9CD69E7-B3E2-4C40-9824-9455096C59C9}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{D9CD69E7-B3E2-4C40-9824-9455096C59C9}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
